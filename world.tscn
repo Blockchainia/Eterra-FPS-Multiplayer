@@ -351,3 +351,5 @@ spawn_path = NodePath("..")
 [connection signal="toggled" from="Menu/MainMenu/MarginContainer/VBoxContainer/OptionsButton" to="." method="_on_options_button_toggled"]
 [connection signal="toggled" from="Menu/MainMenu/MarginContainer/VBoxContainer/OptionsButton" to="Menu/Options/MarginContainer/VBoxContainer/Fullscreen" method="_on_options_button_toggled"]
 [connection signal="toggled" from="Menu/MainMenu/MusicToggle" to="." method="_on_music_toggle_toggled"]
+
+[editable path="map"]
