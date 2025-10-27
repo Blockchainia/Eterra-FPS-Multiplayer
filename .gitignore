@@ -1,23 +1,96 @@
-# Godot 4+ specific ignores
-.godot/
-/android/
-=======
-
-# Godot-specific ignores
+# ---------------------------------------------------------
+# Godot project
+# ---------------------------------------------------------
 .import/
-/exports
-export.cfg
-export_presets.cfg
-/addons
+.export/
+.mono/
+.cache/
+.godot/
+
+# Godot import metadata (auto-generated)
+*.import
+*.uid
+
+# Editor-specific and temporary files
+*.tmp
+*.bak
+*.swp
+*.DS_Store
+Thumbs.db
+
+# ---------------------------------------------------------
+# Build artifacts
+# ---------------------------------------------------------
+# Exported macOS builds (.app bundles, DMGs, scripts)
+builds/
+*.dmg
+*.command
+*.zip
+*.pck
+*.exe
+*.x86_64
+
+# Intermediate export presets or staging folders
+export_presets.cfg~
+*.pdb
+
+# ---------------------------------------------------------
+# IDE and local tools
+# ---------------------------------------------------------
+# VSCode
+.vscode/
+.history/
+.idea/
+
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ---------------------------------------------------------
+# Blender and imported sources
+# ---------------------------------------------------------
+# Godot keeps .blend.import files automatically
+# Keep .blend if you want to edit the 3D source; ignore caches
+*.blend1
+*.blend2
+*.blend@
+*.blend.swp
+
+# ---------------------------------------------------------
+# Logs and runtime artifacts
+# ---------------------------------------------------------
+*.log
+*.out
+*.err
 *.tmp
 
-# Imported translations (automatically generated from CSV files)
-*.translation
+# ---------------------------------------------------------
+# Optional: if you use C# or GDNative
+# ---------------------------------------------------------
+# Uncomment if applicable
+# bin/
+# obj/
+# *.csproj
+# *.sln
+# *.dll
+# *.so
+# *.dylib
+# *.exe
 
-# Mono-specific ignores
-.mono/
-data_*/
-mono_crash.*.json
-
-#extra
-/.vscode
+# ---------------------------------------------------------
+# Project-specific notes
+# ---------------------------------------------------------
+# Keep source assets, scripts, scenes, and textures
+!audio/
+!bootstrap/
+!imports/
+!scenes/
+!scripts/
+!server/
+!singletons/
+!textures/
+!world.tscn
+!project.godot
+!LICENSE
+!README.md

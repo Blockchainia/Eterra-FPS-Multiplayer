@@ -10,15 +10,16 @@ config_version=5
 
 [application]
 
-config/name="FPS Multiplayer Template"
+config/name="EterraFPS"
 config/tags=PackedStringArray("fps", "gamepad", "menu", "multiplayer")
-run/main_scene="res://world.tscn"
-config/features=PackedStringArray("4.3", "Forward Plus")
+run/main_scene="uid://dt34c0hc4ebff"
+config/features=PackedStringArray("4.5", "Forward Plus")
 config/icon="res://icon.svg"
 
 [autoload]
 
 Global="*res://scripts/Global.gd"
+Network="*res://singletons/Network.gd"
 
 [debug]
 
@@ -29,6 +30,10 @@ gdscript/warnings/untyped_declaration=1
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/vsync/vsync_mode=0
+
+[dotnet]
+
+project/assembly_name="FPS Multiplayer Template"
 
 [input]
 

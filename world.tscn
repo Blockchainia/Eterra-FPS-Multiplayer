@@ -1,18 +1,18 @@
 [gd_scene load_steps=23 format=3 uid="uid://b57uspbprxc8"]
 
-[ext_resource type="Script" path="res://scripts/world.gd" id="1_ho7yh"]
+[ext_resource type="Script" uid="uid://cd1bvooas7o4m" path="res://scripts/world.gd" id="1_ho7yh"]
 [ext_resource type="PackedScene" uid="uid://bd3ai1v40ssao" path="res://map.tscn" id="3_fd0sg"]
-[ext_resource type="Script" path="res://scripts/ui/fps_counter.gd" id="4_2328u"]
-[ext_resource type="Script" path="res://scripts/ui/menu/host_button.gd" id="4_nuahp"]
-[ext_resource type="Shader" path="res://scripts/shaders/blur.gdshader" id="4_p7mxg"]
+[ext_resource type="Script" uid="uid://chl816vkrpda8" path="res://scripts/ui/fps_counter.gd" id="4_2328u"]
+[ext_resource type="Script" uid="uid://0f8ss4ubnuwj" path="res://scripts/ui/menu/host_button.gd" id="4_nuahp"]
+[ext_resource type="Shader" uid="uid://b6ayymrhkylhq" path="res://scripts/shaders/blur.gdshader" id="4_p7mxg"]
 [ext_resource type="AudioStream" uid="uid://p6uvqtljqic7" path="res://audio/661248__magmadiverrr__video-game-menu-music.ogg" id="4_taatn"]
-[ext_resource type="Script" path="res://scripts/ui/menu/options/fullscreen.gd" id="5_abwkb"]
-[ext_resource type="Script" path="res://scripts/ui/menu/options/mouse_sensitivity.gd" id="6_00vww"]
-[ext_resource type="Script" path="res://scripts/ui/menu/options/back.gd" id="6_2hany"]
-[ext_resource type="Script" path="res://scripts/ui/menu/options_button.gd" id="6_7g7sm"]
-[ext_resource type="Script" path="res://scripts/ui/menu/pause/resume.gd" id="7_5cdyw"]
-[ext_resource type="Script" path="res://scripts/ui/menu/options/controller_sensitivity.gd" id="7_jhf7u"]
-[ext_resource type="Script" path="res://scripts/ui/menu/pause/quit.gd" id="9_ucmny"]
+[ext_resource type="Script" uid="uid://dcoocqnfhag40" path="res://scripts/ui/menu/options/fullscreen.gd" id="5_abwkb"]
+[ext_resource type="Script" uid="uid://b8g8fngpp1cld" path="res://scripts/ui/menu/options/mouse_sensitivity.gd" id="6_00vww"]
+[ext_resource type="Script" uid="uid://co76seoupgayb" path="res://scripts/ui/menu/options/back.gd" id="6_2hany"]
+[ext_resource type="Script" uid="uid://dfglxfci03w2h" path="res://scripts/ui/menu/options_button.gd" id="6_7g7sm"]
+[ext_resource type="Script" uid="uid://du5qtfmm8p5du" path="res://scripts/ui/menu/pause/resume.gd" id="7_5cdyw"]
+[ext_resource type="Script" uid="uid://bmy1ha2maxmwg" path="res://scripts/ui/menu/options/controller_sensitivity.gd" id="7_jhf7u"]
+[ext_resource type="Script" uid="uid://o3k14mw74n81" path="res://scripts/ui/menu/pause/quit.gd" id="9_ucmny"]
 
 [sub_resource type="PhysicalSkyMaterial" id="PhysicalSkyMaterial_r06yd"]
 energy_multiplier = 1.25
@@ -66,15 +66,15 @@ tracks/0/keys = {
 
 [sub_resource type="AnimationLibrary" id="AnimationLibrary_lekn2"]
 _data = {
-"Dolly": SubResource("Animation_ug7wi"),
-"RESET": SubResource("Animation_ei2s0")
+&"Dolly": SubResource("Animation_ug7wi"),
+&"RESET": SubResource("Animation_ei2s0")
 }
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_nou27"]
 shader = ExtResource("4_p7mxg")
 shader_parameter/blur_amount = 2.0
 shader_parameter/mix_amount = 0.0
-shader_parameter/color_over = null
+shader_parameter/color_over = Color(0, 0, 0, 1)
 
 [sub_resource type="Theme" id="Theme_utqnk"]
 
@@ -116,7 +116,7 @@ bus = &"Music"
 [node name="AnimationPlayer" type="AnimationPlayer" parent="Menu"]
 root_node = NodePath("../Blur")
 libraries = {
-"": SubResource("AnimationLibrary_lekn2")
+&"": SubResource("AnimationLibrary_lekn2")
 }
 autoplay = "Dolly"
 
@@ -217,7 +217,7 @@ size_flags_vertical = 4
 min_value = 0.001
 max_value = 0.1
 step = 0.001
-value = 0.01
+value = 0.009999999999999998
 script = ExtResource("7_jhf7u")
 
 [node name="Back" type="Button" parent="Menu/Options/MarginContainer/VBoxContainer"]
@@ -297,7 +297,7 @@ vertical_alignment = 1
 
 [node name="HostButton" type="Button" parent="Menu/MainMenu/MarginContainer/VBoxContainer"]
 layout_mode = 2
-text = "Host"
+text = "Host Off-Chain"
 script = ExtResource("4_nuahp")
 
 [node name="HBoxContainer" type="HBoxContainer" parent="Menu/MainMenu/MarginContainer/VBoxContainer"]
@@ -334,7 +334,7 @@ button_pressed = true
 text = "Music"
 
 [node name="MultiplayerSpawner" type="MultiplayerSpawner" parent="."]
-_spawnable_scenes = PackedStringArray("res://player.tscn")
+_spawnable_scenes = PackedStringArray("uid://b2qhxdrnviyqf")
 spawn_path = NodePath("..")
 
 [connection signal="toggled" from="Menu/Options/MarginContainer/VBoxContainer/FpsCounter" to="FpsCounter" method="_on_fps_counter_toggled"]

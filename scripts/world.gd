@@ -7,11 +7,21 @@ extends Node
 @onready var menu_music: AudioStreamPlayer = %MenuMusic
 
 const Player = preload("res://player.tscn")
-const PORT = 9999
-var enet_peer: ENetMultiplayerPeer = ENetMultiplayerPeer.new()
+const PORT := 9999
 var paused: bool = false
 var options: bool = false
 var controller: bool = false
+
+func _ready() -> void:
+	# Hook into Network singleton events so the world adds/removes players consistently
+	Network.server_started.connect(func(_p): print("[CLIENT] Host started"))
+	Network.peer_connected.connect(add_player)
+	Network.peer_disconnected.connect(remove_player)
+	Network.connection_failed.connect(func(): push_error("[CLIENT] Connection failed"))
+	multiplayer.connected_to_server.connect(_on_connected_to_server)
+	multiplayer.connection_failed.connect(func(): push_error("[CLIENT] Connection failed (low-level)"))
+	# Align RPC root with the node that owns players on the client
+	multiplayer.root_path = get_path()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if Input.is_action_pressed("pause") and !main_menu.visible and !options_menu.visible:
@@ -27,6 +37,14 @@ func _process(_delta: float) -> void:
 		pause_menu.show()
 		if !controller:
 			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+func _on_connected_to_server() -> void:
+	# We just successfully connected to a (likely headless) server.
+	# Spawn our local player so camera/current gets set by player.gd (_ready).
+	add_player(multiplayer.get_unique_id())
+	# Match host behavior: capture mouse when entering gameplay from Join.
+	if !controller:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func _on_resume_pressed() -> void:
 	if !options:
@@ -52,22 +70,22 @@ func _on_back_pressed() -> void:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 		options = false
 
-#func _ready() -> void:
 func _on_host_button_pressed() -> void:
 	main_menu.hide()
 	$Menu/DollyCamera.hide()
 	$Menu/Blur.hide()
 	menu_music.stop()
 
-	enet_peer.create_server(PORT)
-	multiplayer.multiplayer_peer = enet_peer
-	multiplayer.peer_connected.connect(add_player)
-	multiplayer.peer_disconnected.connect(remove_player)
+	var err := Network.start_host(PORT, 32)
+	if err != OK:
+		push_error("Failed to host: %s" % err)
+		return
+
+	# Ensure local player exists (self doesn't emit peer_connected for host)
+	add_player(multiplayer.get_unique_id())
 
 	if options_menu.visible:
 		options_menu.hide()
-
-	add_player(multiplayer.get_unique_id())
 
 	upnp_setup()
 
@@ -75,11 +93,17 @@ func _on_join_button_pressed() -> void:
 	main_menu.hide()
 	$Menu/Blur.hide()
 	menu_music.stop()
-	
-	enet_peer.create_client(address_entry.text, PORT)
+
+	var addr := address_entry.text.strip_edges()
+	if addr.is_empty():
+		addr = "127.0.0.1"
+	var err := Network.start_client(addr, PORT)
+	if err != OK:
+		push_error("Failed to connect: %s" % err)
+		return
+
 	if options_menu.visible:
 		options_menu.hide()
-	multiplayer.multiplayer_peer = enet_peer
 
 func _on_options_button_toggled(toggled_on: bool) -> void:
 	if toggled_on:
