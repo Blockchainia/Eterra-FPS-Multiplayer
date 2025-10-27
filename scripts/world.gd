@@ -128,6 +128,11 @@ func _on_music_toggle_toggled(toggled_on: bool) -> void:
 		menu_music.play()
 
 func add_player(peer_id: int) -> void:
+	# Do not create a local player for the dedicated server peer (1) when we are a client.
+	# On a listen host, multiplayer.is_server() is true, so we still spawn the local player with id 1 explicitly.
+	if peer_id == 1 and not multiplayer.is_server():
+		return
+
 	var player: Node = Player.instantiate()
 	player.name = str(peer_id)
 	add_child(player)

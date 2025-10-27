@@ -102,7 +102,7 @@ func _on_peer_connected(id: int) -> void:
 	get_node("World").add_child(player)
 	print("[NET] + peer ", id, " (players=", _players_in_match, ")")
 	_send_round_update_to(id)
-	if _state == RoundState.INTERMISSION and _token == 0:
+	if _state == RoundState.INTERMISSION and _state_ends_at_unix == 0.0:
 		# First player while idle → start round immediately
 		_enter_round()
 
@@ -116,7 +116,7 @@ func _on_peer_disconnected(id: int) -> void:
 	print("[NET] - peer ", id, " (players=", _players_in_match, ")")
 	if _players_in_match == 0:
 		_bump_token() # cancel any timers
-		_enter_intermission(false)
+		call_deferred("_enter_intermission", false)
 
 func _reset_players_to_spawn() -> void:
 	var world := get_node("World")
@@ -126,15 +126,18 @@ func _reset_players_to_spawn() -> void:
 			c.rpc_id(int(c.name), "rpc_reset_to_spawn")
 
 func _send_round_update_to(peer_id: int) -> void:
-	# Send current state and end time to this peer via their player node
+	var peers := multiplayer.get_peers()
+	if not peers.has(peer_id):
+		return
 	var world := get_node("World")
 	var player := world.get_node_or_null(str(peer_id))
 	if player != null:
 		player.rpc_id(peer_id, "rpc_round_update", _state, _state_ends_at_unix)
 
 func _broadcast_round_update() -> void:
-	# Inform all connected peers
+	var peers := multiplayer.get_peers()
 	var world := get_node("World")
 	for c in world.get_children():
 		var pid := int(c.name)
-		_send_round_update_to(pid)
+		if peers.has(pid):
+			_send_round_update_to(pid)
