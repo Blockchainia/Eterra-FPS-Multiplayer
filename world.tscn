@@ -337,6 +337,15 @@ text = "Music"
 _spawnable_scenes = PackedStringArray("uid://b2qhxdrnviyqf")
 spawn_path = NodePath("..")
 
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="RoundLabel" type="Label" parent="HUD"]
+custom_minimum_size = Vector2(16, 16)
+offset_left = 16.0
+offset_top = 16.0
+offset_right = 216.0
+offset_bottom = 66.0
+
 [connection signal="toggled" from="Menu/Options/MarginContainer/VBoxContainer/FpsCounter" to="FpsCounter" method="_on_fps_counter_toggled"]
 [connection signal="toggled" from="Menu/Options/MarginContainer/VBoxContainer/Ping" to="FpsCounter" method="_on_ping_toggled"]
 [connection signal="value_changed" from="Menu/Options/MarginContainer/VBoxContainer/HBoxContainer/MouseSensitivity" to="Menu/Options/MarginContainer/VBoxContainer/HBoxContainer/MouseSensitivity" method="_on_value_changed"]

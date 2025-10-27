@@ -12,6 +12,12 @@ var paused: bool = false
 var options: bool = false
 var controller: bool = false
 
+# --- Round HUD state ---
+const STATE_NAMES := {0: "Intermission", 1: "Preparation", 2: "In Round"}
+var _round_state: int = 0
+var _round_ends_at: float = 0.0
+var _round_label: Label
+
 func _ready() -> void:
 	# Hook into Network singleton events so the world adds/removes players consistently
 	Network.server_started.connect(func(_p): print("[CLIENT] Host started"))
@@ -22,6 +28,9 @@ func _ready() -> void:
 	multiplayer.connection_failed.connect(func(): push_error("[CLIENT] Connection failed (low-level)"))
 	# Align RPC root with the node that owns players on the client
 	multiplayer.root_path = get_path()
+	# HUD label setup
+	_round_label = _ensure_round_label()
+	_update_round_label()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if Input.is_action_pressed("pause") and !main_menu.visible and !options_menu.visible:
@@ -37,6 +46,7 @@ func _process(_delta: float) -> void:
 		pause_menu.show()
 		if !controller:
 			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_update_round_label()
 
 func _on_connected_to_server() -> void:
 	# We just successfully connected to a (likely headless) server.
@@ -138,3 +148,40 @@ func upnp_setup() -> void:
 		print("Failed to establish upnp connection!")
 	else:
 		print("Success! Join Address: %s" % upnp.query_external_address())
+
+func apply_round_update(state: int, ends_at_unix: float) -> void:
+	_round_state = state
+	_round_ends_at = ends_at_unix
+	_update_round_label()
+
+func _ensure_round_label() -> Label:
+	var lbl: Label = get_node_or_null("HUD/RoundLabel") as Label
+	if lbl == null:
+		var hud: CanvasLayer = get_node_or_null("HUD") as CanvasLayer
+		if hud == null:
+			hud = CanvasLayer.new()
+			hud.name = "HUD"
+			add_child(hud)
+		lbl = Label.new()
+		lbl.name = "RoundLabel"
+		hud.add_child(lbl)
+		lbl.position = Vector2(16, 16)
+		lbl.autowrap_mode = TextServer.AUTOWRAP_OFF
+	return lbl
+
+func _update_round_label() -> void:
+	if _round_label == null:
+		return
+	var name: String = (STATE_NAMES.get(_round_state, "Unknown") as String)
+	var remain: int = 0
+	if _round_ends_at > 0.0:
+		var now: float = Time.get_unix_time_from_system()
+		remain = int(max(0.0, _round_ends_at - now))
+	var mm: int = remain / 60
+	var ss: int = remain % 60
+	_round_label.text = "%s — %02d:%02d" % [name, mm, ss]
+	_round_label.visible = true
+
+
+func get_round_state() -> int:
+	return _round_state
