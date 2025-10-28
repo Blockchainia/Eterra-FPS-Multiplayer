@@ -28,6 +28,7 @@ const SPEED = 5.5
 const JUMP_VELOCITY = 4.5
 var _is_participant: bool = false
 var _spawn_transform: Transform3D
+var _last_fire_server: float = 0.0
 
 func _can_translate() -> bool:
 	var world := get_tree().get_root().get_node_or_null("World")
@@ -73,11 +74,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	camera.rotation.x = clamp(camera.rotation.x, -PI/2, PI/2)
 
 	if Input.is_action_just_pressed("shoot") and anim_player.current_animation != "shoot":
+		# Local feedback
 		play_shoot_effects.rpc()
 		gunshot_sound.play()
-		if raycast.is_colliding() and str(raycast.get_collider()).contains("CharacterBody3D"):
-			var hit_player: Object = raycast.get_collider()
-			hit_player.recieve_damage.rpc_id(hit_player.get_multiplayer_authority())
+		# Report fire to server for authoritative validation
+		var origin := camera.global_transform.origin
+		var dir := -camera.global_transform.basis.z
+		var ts := Time.get_unix_time_from_system()
+		rpc_id(1, "rpc_report_fire", origin, dir, ts)
 
 	if Input.is_action_just_pressed("respawn"):
 		recieve_damage(2)
@@ -89,6 +93,38 @@ func _unhandled_input(event: InputEvent) -> void:
 		else:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 			mouse_captured = true
+
+@rpc("any_peer", "reliable")
+func rpc_report_fire(origin: Vector3, dir: Vector3, ts: float) -> void:
+	# Server authoritative hit validation
+	if not multiplayer.is_server():
+		return
+	var sender := multiplayer.get_remote_sender_id()
+	# Ensure this RPC is executing on the sender's own Player node on the server
+	if sender != str(name).to_int():
+		return
+	# Rate limit
+	var now := Time.get_unix_time_from_system()
+	if now - _last_fire_server < 0.08: # ~12.5 shots/sec max
+		return
+	_last_fire_server = now
+	# Ensure sender is a participant this round
+	var hs := get_tree().get_root().get_node_or_null("HeadlessServer")
+	if hs and hs.has_method("is_participant"):
+		if not hs.is_participant(sender):
+			return
+	# Raycast on server
+	var space := get_world_3d().direct_space_state
+	var to := origin + dir.normalized() * 100.0
+	var query := PhysicsRayQueryParameters3D.create(origin, to)
+	query.collide_with_areas = false
+	query.exclude = [self]
+	var hit := space.intersect_ray(query)
+	if hit.has("collider"):
+		var col: Object = hit["collider"]
+		if col != null and col.has_method("recieve_damage"):
+			# Apply damage via server -> client RPC
+			(col as Object).recieve_damage.rpc_id((col as Object).get_multiplayer_authority(), 1)
 
 func _physics_process(delta: float) -> void:
 	if multiplayer.multiplayer_peer != null:
@@ -142,6 +178,10 @@ func play_shoot_effects() -> void:
 
 @rpc("any_peer")
 func recieve_damage(damage:= 1) -> void:
+	var sender := multiplayer.get_remote_sender_id()
+	# Only accept damage from the server (peer 1) or local (sender==0) for debug/local respawn
+	if sender != 1 and sender != 0:
+		return
 	health -= damage
 	print("[DMG] auth=", get_multiplayer_authority(), " dmg=", damage, " hp=", health)
 	if health <= 0:
@@ -164,6 +204,8 @@ func rpc_reset_to_spawn() -> void:
 
 @rpc("any_peer")
 func rpc_set_participation(is_participant: bool) -> void:
+	if multiplayer.get_remote_sender_id() != 1 and not multiplayer.is_server():
+		return
 	# Server authoritative: flip between participant and spectator state.
 	_is_participant = is_participant
 	if not is_multiplayer_authority():
@@ -185,9 +227,10 @@ func rpc_set_participation(is_participant: bool) -> void:
 
 @rpc("any_peer")
 func rpc_move_to_spectator_area() -> void:
-	# Optional extra nudge from server; keeps spectators out of bounds
-	if not is_multiplayer_authority():
+	if multiplayer.get_remote_sender_id() != 1 and not multiplayer.is_server():
 		return
+	# Optional extra nudge from server; keeps spectators out of bounds
+	if not is_multiplayer_authority(): return
 	var t := global_transform
 	t.origin = Vector3(0, -1000, 0)
 	global_transform = t

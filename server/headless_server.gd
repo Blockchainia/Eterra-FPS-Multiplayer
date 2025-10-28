@@ -31,6 +31,9 @@ func _ready_count() -> int:
 			n += 1
 	return n
 
+func is_participant(id: int) -> bool:
+	return _participants.has(id)
+
 func _ready() -> void:
 	# Ensure common parent for players
 	var world := get_node_or_null("World")
