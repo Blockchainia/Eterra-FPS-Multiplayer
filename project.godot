@@ -13,7 +13,7 @@ config_version=5
 config/name="EterraFPS"
 config/tags=PackedStringArray("fps", "gamepad", "menu", "multiplayer")
 run/main_scene="uid://dt34c0hc4ebff"
-config/features=PackedStringArray("4.5", "Forward Plus")
+config/features=PackedStringArray("4.5", "C#", "Forward Plus")
 config/icon="res://icon.svg"
 
 [autoload]

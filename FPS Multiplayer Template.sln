@@ -1,0 +1,19 @@
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FPS Multiplayer Template", "FPS Multiplayer Template.csproj", "{171E1D38-390F-4034-82D7-F3702D77AE30}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+	Debug|Any CPU = Debug|Any CPU
+	ExportDebug|Any CPU = ExportDebug|Any CPU
+	ExportRelease|Any CPU = ExportRelease|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{171E1D38-390F-4034-82D7-F3702D77AE30}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{171E1D38-390F-4034-82D7-F3702D77AE30}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{171E1D38-390F-4034-82D7-F3702D77AE30}.ExportDebug|Any CPU.ActiveCfg = ExportDebug|Any CPU
+		{171E1D38-390F-4034-82D7-F3702D77AE30}.ExportDebug|Any CPU.Build.0 = ExportDebug|Any CPU
+		{171E1D38-390F-4034-82D7-F3702D77AE30}.ExportRelease|Any CPU.ActiveCfg = ExportRelease|Any CPU
+		{171E1D38-390F-4034-82D7-F3702D77AE30}.ExportRelease|Any CPU.Build.0 = ExportRelease|Any CPU
+	EndGlobalSection
+EndGlobal

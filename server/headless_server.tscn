@@ -1,6 +1,10 @@
-[gd_scene load_steps=2 format=3 uid="uid://dedvvlsl8386r"]
+[gd_scene load_steps=3 format=3 uid="uid://dedvvlsl8386r"]
 
 [ext_resource type="Script" uid="uid://j0hlr8523wjm" path="res://server/headless_server.gd" id="1_g7p55"]
+[ext_resource type="Script" uid="uid://ct1vtpj6dmmhm" path="res://server/SubstrateNetwork.cs" id="2_wtpml"]
 
 [node name="HeadlessServer" type="Node"]
 script = ExtResource("1_g7p55")
+
+[node name="Node" type="Node" parent="."]
+script = ExtResource("2_wtpml")
