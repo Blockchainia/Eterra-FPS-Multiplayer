@@ -1,4 +1,4 @@
-[gd_scene load_steps=23 format=3 uid="uid://b57uspbprxc8"]
+[gd_scene load_steps=24 format=3 uid="uid://b57uspbprxc8"]
 
 [ext_resource type="Script" uid="uid://cd1bvooas7o4m" path="res://scripts/world.gd" id="1_ho7yh"]
 [ext_resource type="PackedScene" uid="uid://bd3ai1v40ssao" path="res://map.tscn" id="3_fd0sg"]
@@ -77,6 +77,8 @@ shader_parameter/mix_amount = 0.0
 shader_parameter/color_over = Color(0, 0, 0, 1)
 
 [sub_resource type="Theme" id="Theme_utqnk"]
+
+[sub_resource type="Theme" id="Theme_2o6r5"]
 
 [node name="World" type="Node"]
 script = ExtResource("1_ho7yh")
@@ -345,6 +347,101 @@ offset_left = 16.0
 offset_top = 16.0
 offset_right = 216.0
 offset_bottom = 66.0
+
+[node name="HUD_PlayerMenu" type="CanvasLayer" parent="."]
+visible = false
+
+[node name="PlayerMenu" type="Panel" parent="HUD_PlayerMenu"]
+custom_minimum_size = Vector2(560, 480)
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -280.0
+offset_top = -325.0
+offset_right = 280.0
+offset_bottom = 325.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Pad" type="MarginContainer" parent="HUD_PlayerMenu/PlayerMenu"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="VBox" type="VBoxContainer" parent="HUD_PlayerMenu/PlayerMenu/Pad"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="H" type="HBoxContainer" parent="HUD_PlayerMenu/PlayerMenu/Pad/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 12
+
+[node name="ColParticipants" type="VBoxContainer" parent="HUD_PlayerMenu/PlayerMenu/Pad/VBox/H"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Label" type="Label" parent="HUD_PlayerMenu/PlayerMenu/Pad/VBox/H/ColParticipants"]
+layout_mode = 2
+theme = SubResource("Theme_2o6r5")
+text = "Participants
+"
+horizontal_alignment = 1
+
+[node name="Participants" type="ItemList" parent="HUD_PlayerMenu/PlayerMenu/Pad/VBox/H/ColParticipants"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/v_separation = 8
+theme_override_constants/outline_size = 2
+
+[node name="ColReady" type="VBoxContainer" parent="HUD_PlayerMenu/PlayerMenu/Pad/VBox/H"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Label" type="Label" parent="HUD_PlayerMenu/PlayerMenu/Pad/VBox/H/ColReady"]
+layout_mode = 2
+theme = SubResource("Theme_2o6r5")
+text = "Ready To Join"
+horizontal_alignment = 1
+
+[node name="Ready" type="ItemList" parent="HUD_PlayerMenu/PlayerMenu/Pad/VBox/H/ColReady"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/v_separation = 8
+theme_override_constants/outline_size = 2
+
+[node name="ColInactive" type="VBoxContainer" parent="HUD_PlayerMenu/PlayerMenu/Pad/VBox/H"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Label" type="Label" parent="HUD_PlayerMenu/PlayerMenu/Pad/VBox/H/ColInactive"]
+layout_mode = 2
+theme = SubResource("Theme_2o6r5")
+text = "Inactive Spectators
+"
+horizontal_alignment = 1
+
+[node name="Inactive" type="ItemList" parent="HUD_PlayerMenu/PlayerMenu/Pad/VBox/H/ColInactive"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/v_separation = 8
+theme_override_constants/outline_size = 2
+
+[node name="ReadyButton" type="Button" parent="HUD_PlayerMenu/PlayerMenu/Pad/VBox"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+text = "Join Next Game"
 
 [connection signal="toggled" from="Menu/Options/MarginContainer/VBoxContainer/FpsCounter" to="FpsCounter" method="_on_fps_counter_toggled"]
 [connection signal="toggled" from="Menu/Options/MarginContainer/VBoxContainer/Ping" to="FpsCounter" method="_on_ping_toggled"]

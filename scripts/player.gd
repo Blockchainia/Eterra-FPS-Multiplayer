@@ -37,6 +37,7 @@ func _can_translate() -> bool:
 
 func _enter_tree() -> void:
 	set_multiplayer_authority(str(name).to_int())
+	print("[PLAYER] _enter_tree name=", name, " auth=", get_multiplayer_authority(), " is_auth=", is_multiplayer_authority())
 
 func _ready() -> void:
 	if not is_multiplayer_authority(): return
@@ -45,6 +46,7 @@ func _ready() -> void:
 	camera.current = true
 	position = spawns[randi() % spawns.size()]
 	_spawn_transform = global_transform
+	print("[PLAYER] _ready auth=", get_multiplayer_authority(), " pos=", global_transform.origin)
 
 func _process(_delta: float) -> void:
 	sensitivity = Global.sensitivity
@@ -135,11 +137,14 @@ func play_shoot_effects() -> void:
 @rpc("any_peer")
 func recieve_damage(damage:= 1) -> void:
 	health -= damage
+	print("[DMG] auth=", get_multiplayer_authority(), " dmg=", damage, " hp=", health)
 	if health <= 0:
+		print("[DMG] KILL -> respawn auth=", get_multiplayer_authority())
 		health = 2
 		position = spawns[randi() % spawns.size()]
 
 func reset_to_spawn() -> void:
+	print("[PLAYER] reset_to_spawn auth=", get_multiplayer_authority())
 	global_transform = _spawn_transform
 	velocity = Vector3.ZERO
 
@@ -148,8 +153,29 @@ func rpc_reset_to_spawn() -> void:
 	reset_to_spawn()
 
 
+
+@rpc("any_peer")
+func rpc_set_ready(ready: bool) -> void:
+	# Client → Server: mark this peer as ready/unready for next game
+	if multiplayer.is_server():
+		var server := get_tree().get_root().get_node_or_null("HeadlessServer")
+		var sender := multiplayer.get_remote_sender_id()
+		print("[READY] rpc_set_ready sender=", sender, " -> ", ready)
+		if server and server.has_method("_on_player_ready_changed"):
+			server._on_player_ready_changed(sender, ready)
+	else:
+		print("[READY] rpc_set_ready ignored on client (value=", ready, ")")
+
+@rpc("any_peer")
+func rpc_roster_update(participants: Array, ready: Array, inactive: Array) -> void:
+	# Server → Client: update Player Menu roster
+	var world := get_tree().get_root().get_node_or_null("World")
+	if world and world.has_method("apply_roster_update"):
+		world.apply_roster_update(participants, ready, inactive)
+
 @rpc("any_peer")
 func rpc_round_update(state: int, ends_at_unix: float) -> void:
+	print("[ROUND] recv state=", state, " ends_at=", ends_at_unix)
 	var world := get_tree().get_root().get_node_or_null("World")
 	if world and world.has_method("apply_round_update"):
 		world.apply_round_update(state, ends_at_unix)
