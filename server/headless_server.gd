@@ -3,6 +3,7 @@ extends Node
 const PORT := 9999
 const MAX_CLIENTS := 32
 const Player = preload("res://player.tscn")
+const FULL_HEALTH := 2
 
 # --- Round config (defaults) ---
 var round_time: float = 30.0
@@ -33,6 +34,21 @@ func _ready_count() -> int:
 
 func is_participant(id: int) -> bool:
 	return _participants.has(id)
+
+func _set_player_health(peer_id: int, hp: int) -> void:
+	var world := get_node("World")
+	var p := world.get_node_or_null(str(peer_id))
+	if p:
+		# Set on server copy and replicate to owner
+		p.set("health", hp)
+		if p.has_method("set_health"):
+			p.rpc_id(peer_id, "set_health", hp)
+
+func _full_heal_all() -> void:
+	var world := get_node("World")
+	for c in world.get_children():
+		var pid := int(c.name)
+		_set_player_health(pid, FULL_HEALTH)
 
 func _ready() -> void:
 	# Ensure common parent for players
@@ -100,6 +116,7 @@ func _enter_intermission(timed: bool) -> void:
 		var pid := int(c.name)
 		c.rpc_id(pid, "rpc_set_participation", false)
 		c.rpc_id(pid, "rpc_move_to_spectator_area")
+	_full_heal_all()
 	if timed and _players_in_match > 0:
 		_set_timeout(intermission_time, func():
 			if _players_in_match > 0 and _ready_count() > 0:
@@ -135,6 +152,9 @@ func _enter_preparation() -> void:
 		c.rpc_id(pid, "rpc_set_participation", is_part)
 		if not is_part:
 			c.rpc_id(pid, "rpc_move_to_spectator_area")
+	# Ensure participants start with full health
+	for id in _participants.keys():
+		_set_player_health(int(id), FULL_HEALTH)
 	_broadcast_round_update()
 	_broadcast_roster()
 	_set_timeout(preparation_time, func(): _enter_round())
@@ -155,6 +175,9 @@ func _on_peer_connected(id: int) -> void:
 	player.set_multiplayer_authority(id, true)
 	print("[NET] set authority for player ", id)
 	get_node("World").add_child(player)
+	# Initialize server-authoritative health on join
+	player.set("health", FULL_HEALTH)
+	player.rpc_id(id, "set_health", FULL_HEALTH)
 	# New connections start as spectators and are moved out of the arena
 	player.rpc_id(id, "rpc_set_participation", false)
 	player.rpc_id(id, "rpc_move_to_spectator_area")

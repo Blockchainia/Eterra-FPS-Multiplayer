@@ -7,7 +7,7 @@ extends CharacterBody3D
 @onready var gunshot_sound: AudioStreamPlayer3D = %GunshotSound
 
 ## Number of shots before a player dies
-@export var health : int = 2
+var health: int = 2
 ## The xyz position of the random spawns, you can add as many as you want!
 @export var spawns: PackedVector3Array = PackedVector3Array([
 	Vector3(-18, 0.2, 0),
@@ -96,35 +96,56 @@ func _unhandled_input(event: InputEvent) -> void:
 
 @rpc("any_peer", "reliable")
 func rpc_report_fire(origin: Vector3, dir: Vector3, ts: float) -> void:
-	# Server authoritative hit validation
+	# --- Server authoritative hit validation ---
 	if not multiplayer.is_server():
 		return
 	var sender := multiplayer.get_remote_sender_id()
-	# Ensure this RPC is executing on the sender's own Player node on the server
+
+	# Ensure this executes on the sender's own Player node on the server
 	if sender != str(name).to_int():
 		return
-	# Rate limit
+
+	# Rate limit (~12.5 shots/sec)
 	var now := Time.get_unix_time_from_system()
-	if now - _last_fire_server < 0.08: # ~12.5 shots/sec max
+	if now - _last_fire_server < 0.08:
 		return
 	_last_fire_server = now
-	# Ensure sender is a participant this round
+
+	# Only participants can shoot
 	var hs := get_tree().get_root().get_node_or_null("HeadlessServer")
 	if hs and hs.has_method("is_participant"):
 		if not hs.is_participant(sender):
 			return
-	# Raycast on server
+
+	# Robust server raycast
 	var space := get_world_3d().direct_space_state
 	var to := origin + dir.normalized() * 100.0
 	var query := PhysicsRayQueryParameters3D.create(origin, to)
 	query.collide_with_areas = false
-	query.exclude = [self]
+	query.collide_with_bodies = true
+
+	# Exclude the shooter (and its shapes) to avoid self-hits
+	var excludes: Array = [self, self.get_rid()]
+	for n in get_children():
+		if n is CollisionObject3D:
+			excludes.append((n as CollisionObject3D).get_rid())
+	query.exclude = excludes
+	# Optional if you customized layers: query.collision_mask = 0xFFFFFFFF
+
 	var hit := space.intersect_ray(query)
-	if hit.has("collider"):
-		var col: Object = hit["collider"]
-		if col != null and col.has_method("recieve_damage"):
-			# Apply damage via server -> client RPC
-			(col as Object).recieve_damage.rpc_id((col as Object).get_multiplayer_authority(), 1)
+	if hit.is_empty():
+		return
+
+	# Climb to a node that actually owns recieve_damage (collider may be a child)
+	var node := hit.get("collider") as Node
+	var climb := 0
+	while node != null and not node.has_method("recieve_damage") and climb < 6:
+		node = node.get_parent()
+		climb += 1
+
+	if node != null and node.has_method("recieve_damage"):
+		# Apply damage LOCALLY on the server (this function will replicate HP/respawn)
+		node.call("recieve_damage", 1)
 
 func _physics_process(delta: float) -> void:
 	if multiplayer.multiplayer_peer != null:
@@ -176,19 +197,33 @@ func play_shoot_effects() -> void:
 	muzzle_flash.restart()
 	muzzle_flash.emitting = true
 
+@rpc("any_peer", "reliable")
+func set_health(new_health: int) -> void:
+	# Only accept from server (peer 1) or when running on the server itself
+	if multiplayer.get_remote_sender_id() != 1 and not multiplayer.is_server():
+		return
+	health = new_health
+	print("[HP] set by server -> ", health)
+
 @rpc("any_peer")
 func recieve_damage(damage:= 1) -> void:
-	var sender := multiplayer.get_remote_sender_id()
-	# Only accept damage from the server (peer 1) or local (sender==0) for debug/local respawn
-	if sender != 1 and sender != 0:
+	# Server-only: validate and apply damage, then replicate health
+	if not multiplayer.is_server():
 		return
-	health -= damage
-	print("[DMG] auth=", get_multiplayer_authority(), " dmg=", damage, " hp=", health)
+	var owner_id := str(name).to_int()
+	var new_hp := health - damage
+	health = new_hp
+	print("[DMG][SERVER] player=", name, " -> HP=", health)
+	# Sync new HP to owning client
+	rpc_id(owner_id, "set_health", health)
+	# Handle death/respawn authoritatively
 	if health <= 0:
-		print("[DMG] KILL -> respawn auth=", get_multiplayer_authority())
+		# Reset server-side HP and ask client to respawn locally
 		health = 2
-		if _is_participant:
-			position = spawns[randi() % spawns.size()]
+		print("[DMG][SERVER] respawn player=", name)
+		# Update client with reset health and trigger client-side respawn
+		rpc_id(owner_id, "set_health", health)
+		rpc_id(owner_id, "rpc_do_respawn")
 
 func reset_to_spawn() -> void:
 	print("[PLAYER] reset_to_spawn auth=", get_multiplayer_authority())
@@ -201,6 +236,18 @@ func rpc_reset_to_spawn() -> void:
 	if _is_participant:
 		reset_to_spawn()
 
+@rpc("any_peer", "reliable")
+func rpc_do_respawn() -> void:
+	# Only accept from server
+	if multiplayer.get_remote_sender_id() != 1 and not multiplayer.is_server():
+		return
+	if not is_multiplayer_authority():
+		return
+	if _is_participant:
+		position = spawns[randi() % spawns.size()]
+		_spawn_transform = global_transform
+		velocity = Vector3.ZERO
+		print("[RESPAWN][CLIENT] respawned at ", global_transform.origin)
 
 @rpc("any_peer")
 func rpc_set_participation(is_participant: bool) -> void:
