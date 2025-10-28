@@ -91,6 +91,12 @@ func _enter_intermission(timed: bool) -> void:
 	_participants.clear()
 	_broadcast_round_update()
 	_broadcast_roster()
+	# Everyone becomes a spectator during intermission
+	var world := get_node("World")
+	for c in world.get_children():
+		var pid := int(c.name)
+		c.rpc_id(pid, "rpc_set_participation", false)
+		c.rpc_id(pid, "rpc_move_to_spectator_area")
 	if timed and _players_in_match > 0:
 		_set_timeout(intermission_time, func():
 			if _players_in_match > 0 and _ready_count() > 0:
@@ -118,6 +124,14 @@ func _enter_preparation() -> void:
 	for k in _participants.keys():
 		_parts_now.append(k)
 	print("[ROUND] prep: participants this round → ", _parts_now)
+	# Inform each client of their participation status for this round
+	var world := get_node("World")
+	for c in world.get_children():
+		var pid := int(c.name)
+		var is_part := _participants.has(pid)
+		c.rpc_id(pid, "rpc_set_participation", is_part)
+		if not is_part:
+			c.rpc_id(pid, "rpc_move_to_spectator_area")
 	_broadcast_round_update()
 	_broadcast_roster()
 	_set_timeout(preparation_time, func(): _enter_round())
@@ -138,6 +152,9 @@ func _on_peer_connected(id: int) -> void:
 	player.set_multiplayer_authority(id, true)
 	print("[NET] set authority for player ", id)
 	get_node("World").add_child(player)
+	# New connections start as spectators and are moved out of the arena
+	player.rpc_id(id, "rpc_set_participation", false)
+	player.rpc_id(id, "rpc_move_to_spectator_area")
 	_ready_flags[id] = false
 	_participants.erase(id)
 	print("[NET] + peer ", id, " (players=", _players_in_match, ")")
@@ -236,6 +253,20 @@ func _broadcast_roster() -> void:
 func _on_player_ready_changed(peer_id: int, ready: bool) -> void:
 	_ready_flags[peer_id] = ready
 	print("[ROSTER] ready update -> ", peer_id, " = ", ready)
+	# During PREPARATION, reflect the player's wish immediately in participation
+	if _state == RoundState.PREPARATION:
+		if ready:
+			_participants[peer_id] = true
+			var p := get_node("World").get_node_or_null(str(peer_id))
+			if p:
+				p.rpc_id(peer_id, "rpc_set_participation", true)
+		else:
+			_participants.erase(peer_id)
+			var p := get_node("World").get_node_or_null(str(peer_id))
+			if p:
+				p.rpc_id(peer_id, "rpc_set_participation", false)
+				p.rpc_id(peer_id, "rpc_move_to_spectator_area")
+
 	# If idling in intermission (no timer set) and someone readies up, begin preparation immediately.
 	if _state == RoundState.INTERMISSION and _state_ends_at_unix == 0.0 and _ready_count() > 0:
 		print("[ROUND] idle→preparation (first ready spectator detected)")

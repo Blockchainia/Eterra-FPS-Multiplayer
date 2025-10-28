@@ -26,14 +26,14 @@ var	mouse_captured : bool = true
 
 const SPEED = 5.5
 const JUMP_VELOCITY = 4.5
+var _is_participant: bool = false
 var _spawn_transform: Transform3D
 
 func _can_translate() -> bool:
-	# Ask World for round state; 1 = PREPARATION → block movement
 	var world := get_tree().get_root().get_node_or_null("World")
 	if world and world.has_method("get_round_state"):
-		return world.get_round_state() != 1
-	return true
+		return _is_participant and world.get_round_state() != 1
+	return _is_participant
 
 func _enter_tree() -> void:
 	set_multiplayer_authority(str(name).to_int())
@@ -42,11 +42,17 @@ func _enter_tree() -> void:
 func _ready() -> void:
 	if not is_multiplayer_authority(): return
 
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-	camera.current = true
-	position = spawns[randi() % spawns.size()]
+	# Do not auto-spawn into the arena unless the server marks us as a participant.
 	_spawn_transform = global_transform
-	print("[PLAYER] _ready auth=", get_multiplayer_authority(), " pos=", global_transform.origin)
+	if _is_participant:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		camera.current = true
+		position = spawns[randi() % spawns.size()]
+		print("[PLAYER] _ready (participant) auth=", get_multiplayer_authority(), " pos=", global_transform.origin)
+	else:
+		camera.current = false
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		print("[PLAYER] _ready (spectator) auth=", get_multiplayer_authority(), " pos=", global_transform.origin)
 
 func _process(_delta: float) -> void:
 	sensitivity = Global.sensitivity
@@ -141,18 +147,50 @@ func recieve_damage(damage:= 1) -> void:
 	if health <= 0:
 		print("[DMG] KILL -> respawn auth=", get_multiplayer_authority())
 		health = 2
-		position = spawns[randi() % spawns.size()]
+		if _is_participant:
+			position = spawns[randi() % spawns.size()]
 
 func reset_to_spawn() -> void:
 	print("[PLAYER] reset_to_spawn auth=", get_multiplayer_authority())
-	global_transform = _spawn_transform
-	velocity = Vector3.ZERO
+	if _is_participant:
+		global_transform = _spawn_transform
+		velocity = Vector3.ZERO
 
 @rpc("any_peer")
 func rpc_reset_to_spawn() -> void:
-	reset_to_spawn()
+	if _is_participant:
+		reset_to_spawn()
 
 
+@rpc("any_peer")
+func rpc_set_participation(is_participant: bool) -> void:
+	# Server authoritative: flip between participant and spectator state.
+	_is_participant = is_participant
+	if not is_multiplayer_authority():
+		return
+	if _is_participant:
+		camera.current = true
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		position = spawns[randi() % spawns.size()]
+		_spawn_transform = global_transform
+		print("[PLAYER] → PARTICIPANT auth=", get_multiplayer_authority(), " pos=", global_transform.origin)
+	else:
+		camera.current = false
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		# Move safely out of the play space while spectating
+		var t := global_transform
+		t.origin = Vector3(0, -1000, 0)
+		global_transform = t
+		print("[PLAYER] → SPECTATOR auth=", get_multiplayer_authority())
+
+@rpc("any_peer")
+func rpc_move_to_spectator_area() -> void:
+	# Optional extra nudge from server; keeps spectators out of bounds
+	if not is_multiplayer_authority():
+		return
+	var t := global_transform
+	t.origin = Vector3(0, -1000, 0)
+	global_transform = t
 
 @rpc("any_peer")
 func rpc_set_ready(ready: bool) -> void:
