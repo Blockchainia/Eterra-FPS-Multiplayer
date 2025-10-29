@@ -18,6 +18,9 @@ var _spawns: PackedVector3Array = PackedVector3Array([
 ])
 const RESPAWN_COOLDOWN := 0.0 # seconds; bump (e.g., 0.5) for a short delay
 
+# Track the spawn index currently assigned to each player (overwrites every respawn)
+var _spawn_in_use := {} # peer_id -> int (index into _spawns)
+
 # --- Round config (defaults) ---
 var round_time: float = 30.0
 var intermission_time: float = 15.0
@@ -68,14 +71,38 @@ func _full_heal_all() -> void:
 
 # --- Respawn helpers ---
 func _pick_spawn(peer_id: int) -> Vector3:
-	# Simple random spawn for now (future: smart picking)
+	# Random free spawn each respawn; avoid duplicates at the moment of assignment.
 	if _spawns.is_empty():
 		return Vector3.ZERO
-	# Use a deterministic offset to reduce clumping when many join at once
-	var idx := int(abs(hash(str(peer_id) + ":" + str(Time.get_ticks_msec()))) % _spawns.size())
-	# Small random jitter to avoid persistent collisions
-	var base := _spawns[idx]
-	return base
+
+	# Free any previous claim for this player (we're selecting anew)
+	if _spawn_in_use.has(peer_id):
+		_spawn_in_use.erase(peer_id)
+
+	# Build set of currently used spawn indices
+	var used := {}
+	for k in _spawn_in_use.keys():
+		used[_spawn_in_use[k]] = true
+
+	# Collect free indices
+	var free: Array = []
+	for i in _spawns.size():
+		if not used.has(i):
+			free.append(i)
+
+	# Randomly choose a free one; if none, reuse randomly (overflow case)
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var chosen: int
+	if free.size() > 0:
+		chosen = free[rng.randi_range(0, free.size() - 1)]
+	else:
+		chosen = rng.randi_range(0, _spawns.size() - 1)
+		print("[SPAWN][WARN] all spawns currently in use; reusing index ", chosen)
+
+	# Record current assignment until next respawn/reassignment
+	_spawn_in_use[peer_id] = chosen
+	return _spawns[chosen]
 
 func _respawn_player(peer_id: int) -> void:
 	var peers := multiplayer.get_peers()
@@ -167,6 +194,7 @@ func _enter_intermission(timed: bool) -> void:
 	_state = RoundState.INTERMISSION
 	print("[ROUND] → INTERMISSION", (" (timed)" if timed else " (idle)"))
 	_state_ends_at_unix = (_now() + intermission_time) if timed else 0.0
+	_spawn_in_use.clear()
 	_participants.clear()
 	_broadcast_round_update()
 	_broadcast_roster()
@@ -194,6 +222,7 @@ func _enter_intermission(timed: bool) -> void:
 func _enter_preparation() -> void:
 	_state = RoundState.PREPARATION
 	print("[ROUND] → PREPARATION (", preparation_time, "s)")
+	_spawn_in_use.clear()
 	_state_ends_at_unix = _now() + preparation_time
 	# Build participants from current ready spectators
 	_participants.clear()
@@ -261,6 +290,7 @@ func _on_peer_disconnected(id: int) -> void:
 			p.queue_free()
 	_ready_flags.erase(id)
 	_participants.erase(id)
+	_spawn_in_use.erase(id)
 	print("[ROSTER] after disconnect -> ready_flags:", _ready_flags, " participants:", _participants)
 	_players_in_match = max(0, _players_in_match - 1)
 	print("[NET] - peer ", id, " (players=", _players_in_match, ")")
@@ -357,7 +387,7 @@ func _on_player_ready_changed(peer_id: int, ready: bool) -> void:
 			var p := get_node("World").get_node_or_null(str(peer_id))
 			if p:
 				p.rpc_id(peer_id, "rpc_set_participation", true)
-			# Immediately place them at a spawn
+			# Immediately place them at a (random free) spawn
 			_respawn_player(peer_id)
 		else:
 			_participants.erase(peer_id)
