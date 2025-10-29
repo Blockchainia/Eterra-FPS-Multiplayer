@@ -24,6 +24,7 @@ var _list_participants: ItemList
 var _list_ready: ItemList
 var _list_inactive: ItemList
 var _btn_ready: Button
+var _has_shown_menu_once: bool = false
 
 # --- Round HUD state ---
 const STATE_NAMES := {0: "Intermission", 1: "Preparation", 2: "In Round"}
@@ -75,6 +76,7 @@ func _on_connected_to_server() -> void:
 	# Spawn our local player so camera/current gets set by player.gd (_ready).
 	add_player(multiplayer.get_unique_id())
 	_set_player_menu_visible(true)
+	_has_shown_menu_once = true
 	# Match host behavior: capture mouse when entering gameplay from Join.
 	if !controller:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -88,9 +90,10 @@ func apply_roster_update(participants: Array, ready: Array, inactive: Array) -> 
 	_ready_specs = ready
 	_inactive_specs = inactive
 	_refresh_player_menu()
-	# Ensure the menu is visible when a roster arrives (helps first-run)
-	if _menu_layer and not _menu_layer.visible:
+	# Only auto-show the first time (initial connect). Afterwards, respect user toggle.
+	if not _has_shown_menu_once and _menu_layer and not _menu_layer.visible:
 		_set_player_menu_visible(true)
+		_has_shown_menu_once = true
 
 func _refresh_player_menu() -> void:
 	if _list_participants == null or _list_ready == null or _list_inactive == null:
@@ -193,6 +196,8 @@ func _on_host_button_pressed() -> void:
 
 	# Ensure local player exists (self doesn't emit peer_connected for host)
 	add_player(multiplayer.get_unique_id())
+	_set_player_menu_visible(true)
+	_has_shown_menu_once = true
 
 	if options_menu.visible:
 		options_menu.hide()
