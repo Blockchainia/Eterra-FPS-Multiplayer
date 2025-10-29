@@ -176,12 +176,28 @@ func _on_options_pressed() -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	options = true
 
+
 func _on_back_pressed() -> void:
 	if options:
 		$Menu/Blur.hide()
 		if !controller:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 		options = false
+
+
+# Gracefully handle quit (menu button)
+func _on_quit_pressed() -> void:
+	# Gracefully disconnect the client before quitting the game
+	Network.stop()
+	get_tree().quit()
+
+
+# Catch window close button
+func _notification(what):
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		# Gracefully disconnect if the window is closed directly
+		Network.stop()
+		get_tree().quit()
 
 func _on_host_button_pressed() -> void:
 	main_menu.hide()

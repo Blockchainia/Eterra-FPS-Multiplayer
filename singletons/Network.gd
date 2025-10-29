@@ -39,10 +39,11 @@ func start_client(address := DEFAULT_ADDRESS, port := DEFAULT_PORT) -> int:
 	return OK
 
 func stop() -> void:
-	if multiplayer.multiplayer_peer:
-		multiplayer.multiplayer_peer.close()
+	if multiplayer.multiplayer_peer != null:
+		var p = multiplayer.multiplayer_peer
+		if p is ENetMultiplayerPeer:
+			(p as ENetMultiplayerPeer).close()
 		multiplayer.multiplayer_peer = null
-	emit_signal("server_stopped")
 
 func _start_server(port: int, max_clients: int) -> int:
 	peer = ENetMultiplayerPeer.new()

@@ -37,12 +37,15 @@ func is_participant(id: int) -> bool:
 
 func _set_player_health(peer_id: int, hp: int) -> void:
 	var world := get_node("World")
+	var peers := multiplayer.get_peers()
 	var p := world.get_node_or_null(str(peer_id))
-	if p:
-		# Set on server copy and replicate to owner
-		p.set("health", hp)
-		if p.has_method("set_health"):
-			p.rpc_id(peer_id, "set_health", hp)
+	if p == null:
+		return
+	# Update server copy
+	p.set("health", hp)
+	# Only RPC to a peer if it's still connected
+	if peers.has(peer_id) and p.has_method("set_health"):
+		p.rpc_id(peer_id, "set_health", hp)
 
 func _full_heal_all() -> void:
 	var world := get_node("World")
@@ -112,8 +115,13 @@ func _enter_intermission(timed: bool) -> void:
 	_broadcast_roster()
 	# Everyone becomes a spectator during intermission
 	var world := get_node("World")
+	var peers := multiplayer.get_peers()
 	for c in world.get_children():
+		if c == null:
+			continue
 		var pid := int(c.name)
+		if not peers.has(pid):
+			continue
 		c.rpc_id(pid, "rpc_set_participation", false)
 		c.rpc_id(pid, "rpc_move_to_spectator_area")
 	_full_heal_all()
@@ -206,12 +214,18 @@ func _on_peer_disconnected(id: int) -> void:
 
 func _reset_players_to_spawn() -> void:
 	var world := get_node("World")
+	var peers := multiplayer.get_peers()
 	print("[ROUND] resetting to spawn participants:")
 	for c in world.get_children():
+		if c == null:
+			continue
 		var pid := int(c.name)
-		if _participants.has(pid):
-			print("  - pid", pid)
-			c.rpc_id(pid, "rpc_reset_to_spawn")
+		if not _participants.has(pid):
+			continue
+		if not peers.has(pid):
+			continue
+		print("  - pid", pid)
+		c.rpc_id(pid, "rpc_reset_to_spawn")
 
 func _send_round_update_to(peer_id: int) -> void:
 	var peers := multiplayer.get_peers()
