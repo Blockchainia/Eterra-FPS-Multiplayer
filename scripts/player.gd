@@ -48,7 +48,6 @@ func _ready() -> void:
 	if _is_participant:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 		camera.current = true
-		position = spawns[randi() % spawns.size()]
 		print("[PLAYER] _ready (participant) auth=", get_multiplayer_authority(), " pos=", global_transform.origin)
 	else:
 		camera.current = false
@@ -211,30 +210,24 @@ func recieve_damage(damage:= 1) -> void:
 	if not multiplayer.is_server():
 		return
 	var owner_id := str(name).to_int()
-	var new_hp := health - damage
-	health = new_hp
+	health = max(health - damage, 0)
 	print("[DMG][SERVER] player=", name, " -> HP=", health)
 	# Sync new HP to owning client
 	rpc_id(owner_id, "set_health", health)
-	# Handle death/respawn authoritatively
+	# If eliminated, hand off to HeadlessServer to respawn (server-authoritative)
 	if health <= 0:
-		# Reset server-side HP and ask client to respawn locally
-		health = 2
-		print("[DMG][SERVER] respawn player=", name)
-		# Update client with reset health and trigger client-side respawn
-		rpc_id(owner_id, "set_health", health)
-		rpc_id(owner_id, "rpc_do_respawn")
+		var server := get_tree().get_root().get_node_or_null("HeadlessServer")
+		if server and server.has_method("_on_player_eliminated"):
+			server._on_player_eliminated(owner_id)
+		return
 
-func reset_to_spawn() -> void:
-	print("[PLAYER] reset_to_spawn auth=", get_multiplayer_authority())
-	if _is_participant:
-		global_transform = _spawn_transform
-		velocity = Vector3.ZERO
-
-@rpc("any_peer")
-func rpc_reset_to_spawn() -> void:
-	if _is_participant:
-		reset_to_spawn()
+@rpc("any_peer", "reliable")
+func rpc_clear_velocity() -> void:
+	# Only accept from server
+	if multiplayer.get_remote_sender_id() != 1 and not multiplayer.is_server():
+		return
+	# CharacterBody3D always has a velocity property
+	velocity = Vector3.ZERO
 
 @rpc("any_peer", "reliable")
 func rpc_do_respawn() -> void:
@@ -243,11 +236,23 @@ func rpc_do_respawn() -> void:
 		return
 	if not is_multiplayer_authority():
 		return
-	if _is_participant:
-		position = spawns[randi() % spawns.size()]
-		_spawn_transform = global_transform
-		velocity = Vector3.ZERO
-		print("[RESPAWN][CLIENT] respawned at ", global_transform.origin)
+	# Cosmetic-only client hook (e.g., screen flash, sound). Server already moved us & set HP.
+	velocity = Vector3.ZERO
+	print("[RESPAWN][CLIENT] cosmetic respawn fx")
+
+@rpc("any_peer", "reliable")
+func rpc_place_at(spawn: Vector3) -> void:
+	# Only accept from server
+	if multiplayer.get_remote_sender_id() != 1 and not multiplayer.is_server():
+		return
+	if not is_multiplayer_authority():
+		return
+	var t := global_transform
+	t.origin = spawn
+	global_transform = t
+	velocity = Vector3.ZERO
+	_spawn_transform = global_transform
+	print("[RESPAWN][CLIENT] placed at ", spawn)
 
 @rpc("any_peer")
 func rpc_set_participation(is_participant: bool) -> void:
@@ -260,8 +265,6 @@ func rpc_set_participation(is_participant: bool) -> void:
 	if _is_participant:
 		camera.current = true
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-		position = spawns[randi() % spawns.size()]
-		_spawn_transform = global_transform
 		print("[PLAYER] → PARTICIPANT auth=", get_multiplayer_authority(), " pos=", global_transform.origin)
 	else:
 		camera.current = false

@@ -3,7 +3,20 @@ extends Node
 const PORT := 9999
 const MAX_CLIENTS := 32
 const Player = preload("res://player.tscn")
+
 const FULL_HEALTH := 2
+
+# --- Spawns for server-authoritative respawn ---
+var _spawns: PackedVector3Array = PackedVector3Array([
+	Vector3(-18, 0.2, 0),
+	Vector3(18, 0.2, 0),
+	Vector3(-2.8, 0.2, -6),
+	Vector3(-17, 0, 17),
+	Vector3(17, 0, 17),
+	Vector3(17, 0, -17),
+	Vector3(-17, 0, -17)
+])
+const RESPAWN_COOLDOWN := 0.0 # seconds; bump (e.g., 0.5) for a short delay
 
 # --- Round config (defaults) ---
 var round_time: float = 30.0
@@ -52,6 +65,50 @@ func _full_heal_all() -> void:
 	for c in world.get_children():
 		var pid := int(c.name)
 		_set_player_health(pid, FULL_HEALTH)
+
+# --- Respawn helpers ---
+func _pick_spawn(peer_id: int) -> Vector3:
+	# Simple random spawn for now (future: smart picking)
+	if _spawns.is_empty():
+		return Vector3.ZERO
+	# Use a deterministic offset to reduce clumping when many join at once
+	var idx := int(abs(hash(str(peer_id) + ":" + str(Time.get_ticks_msec()))) % _spawns.size())
+	# Small random jitter to avoid persistent collisions
+	var base := _spawns[idx]
+	return base
+
+func _respawn_player(peer_id: int) -> void:
+	var peers := multiplayer.get_peers()
+	if not peers.has(peer_id):
+		return
+	var world := get_node("World")
+	var p := world.get_node_or_null(str(peer_id))
+	if p == null:
+		return
+	# Choose spawn and ask the client-authoritative player to apply it
+	var spawn: Vector3 = _pick_spawn(peer_id)
+	if p.has_method("rpc_place_at"):
+		p.rpc_id(peer_id, "rpc_place_at", spawn)
+	else:
+		# Fallback: if this node is server-authoritative, set transform directly
+		var t: Transform3D = p.global_transform
+		t.origin = spawn
+		p.global_transform = t
+		# And try to clear velocity if available
+		if p.has_method("rpc_clear_velocity"):
+			p.rpc_id(peer_id, "rpc_clear_velocity")
+	# Restore full health on server and push to owner
+	_set_player_health(peer_id, FULL_HEALTH)
+
+func _on_player_eliminated(peer_id: int) -> void:
+	# Only react during active rounds; outside of rounds spectators may still be present
+	if _state != RoundState.IN_ROUND:
+		return
+	# Keep them participating for the whole round; just respawn them
+	if RESPAWN_COOLDOWN > 0.0:
+		_set_timeout(RESPAWN_COOLDOWN, func(): _respawn_player(peer_id))
+	else:
+		_respawn_player(peer_id)
 
 func _ready() -> void:
 	# Ensure common parent for players
@@ -160,9 +217,9 @@ func _enter_preparation() -> void:
 		c.rpc_id(pid, "rpc_set_participation", is_part)
 		if not is_part:
 			c.rpc_id(pid, "rpc_move_to_spectator_area")
-	# Ensure participants start with full health
+	# Place participants at server-chosen spawns and restore HP
 	for id in _participants.keys():
-		_set_player_health(int(id), FULL_HEALTH)
+		_respawn_player(int(id))
 	_broadcast_round_update()
 	_broadcast_roster()
 	_set_timeout(preparation_time, func(): _enter_round())
@@ -215,7 +272,7 @@ func _on_peer_disconnected(id: int) -> void:
 func _reset_players_to_spawn() -> void:
 	var world := get_node("World")
 	var peers := multiplayer.get_peers()
-	print("[ROUND] resetting to spawn participants:")
+	print("[ROUND] resetting to spawn participants (server-authoritative):")
 	for c in world.get_children():
 		if c == null:
 			continue
@@ -224,8 +281,8 @@ func _reset_players_to_spawn() -> void:
 			continue
 		if not peers.has(pid):
 			continue
-		print("  - pid", pid)
-		c.rpc_id(pid, "rpc_reset_to_spawn")
+		print("  - respawn pid", pid)
+		_respawn_player(pid)
 
 func _send_round_update_to(peer_id: int) -> void:
 	var peers := multiplayer.get_peers()
@@ -300,6 +357,8 @@ func _on_player_ready_changed(peer_id: int, ready: bool) -> void:
 			var p := get_node("World").get_node_or_null(str(peer_id))
 			if p:
 				p.rpc_id(peer_id, "rpc_set_participation", true)
+			# Immediately place them at a spawn
+			_respawn_player(peer_id)
 		else:
 			_participants.erase(peer_id)
 			var p := get_node("World").get_node_or_null(str(peer_id))
